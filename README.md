@@ -13,6 +13,8 @@
   - DWAVE main
   - DWAVE funzioni
   - funzioni & strutture
+- Aggiungere una guida di installazione o almeno le dipendenze 
+
 
 # Info
 Questo branch offre una decomposizione del programma in classi e funzioni.
