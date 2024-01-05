@@ -1,5 +1,3 @@
-DEBUG = False
-
 """
 ################################### MODEL VARIABLES DICTIONARY ######################################################
 _____________________________________________________________________________________________________________________
@@ -26,6 +24,10 @@ on                  bin dictionary  on(n1, n2)      link between node n1 and n2 
 _____________________________________________________________________________________________________________________
 #####################################################################################################################
 """
+#================================================================================================================================
+# Imports 
+#================================================================================================================================
+
 # D_WAVE
 import dimod
 import dwave.system
@@ -37,6 +39,18 @@ import json
 from structures import *
 
 
+
+#================================================================================================================================
+# Constants & Managers 
+#================================================================================================================================
+
+DEBUG = False
+
+
+
+#================================================================================================================================
+# Functions 
+#================================================================================================================================
 
 def print_model_structure(name: str, model: dimod.ConstrainedQuadraticModel, 
         columns = 10):
@@ -119,7 +133,7 @@ def print_cqm_extrainfo(sample: set, infoset: set, columns = 10):
 
 
 
-def detailed_cqm_solver(cqm_problem: dimod.ConstrainedQuadraticModel, problem_label: str, 
+def cqm_solver(cqm_problem: dimod.ConstrainedQuadraticModel, problem_label: str, 
             depth: int, save_solution = False, save_info = False):
     '''
     Solves the CQM problem using a CQM Hybrid Solver and returns
@@ -163,6 +177,7 @@ def detailed_cqm_solver(cqm_problem: dimod.ConstrainedQuadraticModel, problem_la
                 json.dump(best_solution, fp)
                 print(f"{problem_label} solution updated!")
     else:
+        # No solution found, give sample values
         best_solution = {}
         energy = 0.0
         
@@ -192,11 +207,9 @@ def vm_model(tree: Proxytree, cqm: dimod.ConstrainedQuadraticModel):
     Args:
         - tree (Proxytree): the tree structure to generate the model
         - cqm (ConstrainedQuadraticModel): the CQM to create
-    
-    Returns:
-        - null
     '''
 
+    #______________________________________________________________________________________
     # Variables
     server_status = [
         dimod.Binary("s{}".format(s)) 
@@ -209,14 +222,14 @@ def vm_model(tree: Proxytree, cqm: dimod.ConstrainedQuadraticModel):
         ] for s in range(tree.SERVERS)
     ] 
 
+
+    #______________________________________________________________________________________
     # Objective
-    # 1 - SUM of server pow cons
     obj1 = dimod.quicksum(
         server_status[s] 
         * tree.idle_powcons[s+tree.SWITCHES] 
         for s in range(tree.SERVERS)
     )
-    # 2 - SUM of vm dyn pow cons
     obj2 = dimod.quicksum(
         tree.dyn_powcons[s+tree.SWITCHES] 
         * dimod.quicksum(
@@ -225,11 +238,13 @@ def vm_model(tree: Proxytree, cqm: dimod.ConstrainedQuadraticModel):
             for vm in range(tree.VMS)
         ) for s in range(tree.SERVERS)
     )
-    # Total
+
     cqm.set_objective(obj1 + obj2)
 
-    # Constraints
-    # (11) For each server, the CPU utilization of each VM on that server must be less or equal than server's capacity            
+
+    #______________________________________________________________________________________
+    # Constraints [Numbers refer to mathematical model formulas numbers on the paper]
+    # (3) For each server, the CPU utilization of each VM on that server must be less or equal than server's capacity            
     for s in range(tree.SERVERS):
         cqm.add_constraint(
             dimod.quicksum(
@@ -243,7 +258,7 @@ def vm_model(tree: Proxytree, cqm: dimod.ConstrainedQuadraticModel):
             label="C11-N{}".format(s)
         )
 
-    # (12) For each VM, it must be active on one and only one server
+    # (4) For each VM, it must be active on one and only one server
     for vm in range(tree.VMS):
         cqm.add_constraint(
             dimod.quicksum(
@@ -266,11 +281,10 @@ def path_model(tree: Proxytree, cqm: dimod.ConstrainedQuadraticModel,
         - cqm (ConstrainedQuadraticModel): the CQM to create
         - vm_solution (tuple(dict, int)): the previous VM assignment solution
         - load (bool): boolean var for loading saved results
-    
-    Returns:
-        - null
     '''
     
+    #______________________________________________________________________________________
+    # Variables
     switch_status = [
         dimod.Binary("sw{}".format(sw)) 
         for sw in range(tree.SWITCHES)
@@ -290,7 +304,7 @@ def path_model(tree: Proxytree, cqm: dimod.ConstrainedQuadraticModel,
                 on["on{}-{}".format(n1, n2)] = dimod.Binary("on{}-{}".format(n1, n2))
 
 
-    # Load best solution from file
+    # Load VM solution from file
     if load:
         with open(f"DWAVE LOGS/depth_{tree.DEPTH}/vm_model_solution.txt") as fp:
             vm_solution = json.loads(fp.read())
@@ -298,15 +312,13 @@ def path_model(tree: Proxytree, cqm: dimod.ConstrainedQuadraticModel,
             print(vm_solution)
             print("\n\n")
 
-
+    #______________________________________________________________________________________
     # Objective
-    # 3 - SUM of switch idle pow cons
     obj3 = dimod.quicksum(
         switch_status[sw] 
         * tree.idle_powcons[sw] 
         for sw in range(tree.SWITCHES)
     )
-    # 4 - SUM of flow path
     obj4 = dimod.quicksum(
         tree.dyn_powcons[sw] 
         * (
@@ -318,12 +330,13 @@ def path_model(tree: Proxytree, cqm: dimod.ConstrainedQuadraticModel,
         for sw in range(tree.SWITCHES) 
         if tree.adjancy_list[n][sw] == 1
     )
-    # Total
+
     cqm.set_objective(obj3 + obj4)
 
 
-    # Constraints
-    # (13) For each flow and server, the sum of exiting flow from the server to all adj switch is = than vms part of that flow
+    #______________________________________________________________________________________
+    # Constraints [Numbers refer to mathematical model formulas numbers on the paper]    
+    # (5) For each flow and server, the sum of exiting flow from the server to all adj switch is = than vms part of that flow
     for f in range(tree.FLOWS):
         for s in range(tree.SWITCHES, tree.SWITCHES + tree.SERVERS):           # Start from switches cause nodes are numerated in order -> all switches -> all servers
             if vm_solution.get("vm{}-s{}".format(tree.src_dst[f][0], s-tree.SWITCHES)) == 0:
@@ -337,7 +350,7 @@ def path_model(tree: Proxytree, cqm: dimod.ConstrainedQuadraticModel,
                     label="C13-N{}".format(f*tree.SERVERS+s)
                 )
 
-    # (14) For each flow and server, the sum of entering flow from the server to all adj switch is = than vms part of that flow
+    # (6) For each flow and server, the sum of entering flow from the server to all adj switch is = than vms part of that flow
     for f in range(tree.FLOWS):
         for s in range(tree.SWITCHES, tree.SWITCHES + tree.SERVERS):
             if vm_solution.get("vm{}-s{}".format(tree.src_dst[f][1], s-tree.SWITCHES)) == 0:    
@@ -351,7 +364,7 @@ def path_model(tree: Proxytree, cqm: dimod.ConstrainedQuadraticModel,
                     label="C14-N{}".format(f*tree.SERVERS+s)
                 ) 
 
-    # (15) For each flow and server, force allocation of all flows     
+    # (7) For each flow and server, force allocation of all flows     
     for f in range(tree.FLOWS):
         for s in range(tree.SWITCHES, tree.SWITCHES + tree.SERVERS):
             cqm.add_constraint( 
@@ -373,7 +386,7 @@ def path_model(tree: Proxytree, cqm: dimod.ConstrainedQuadraticModel,
                 label="C15-N{}".format(f*tree.SERVERS+s)
             )
 
-    # (16) For each switch and flow, entering and exiting flow from the switch are equal
+    # (8) For each switch and flow, entering and exiting flow from the switch are equal
     for sw in range(tree.SWITCHES):
         for f in range(tree.FLOWS):
             cqm.add_constraint( 
@@ -391,7 +404,7 @@ def path_model(tree: Proxytree, cqm: dimod.ConstrainedQuadraticModel,
                 label="C16-N{}".format(sw*tree.FLOWS+f)
             )
 
-    # (17) For each link, the data rate on it is less or equal than its capacity      
+    # (9) For each link, the data rate on it is less or equal than its capacity      
     for l in range(tree.LINKS):
         n1,n2 = get_nodes(l, tree.link_dict)
         cqm.add_constraint( 
@@ -408,7 +421,7 @@ def path_model(tree: Proxytree, cqm: dimod.ConstrainedQuadraticModel,
             label="C17-N{}".format(l)
         )
 
-    # (18)(19) For each link, the link is ON only if both nodes are ON       
+    # (10)(11) For each link, the link is ON only if both nodes are ON       
     for l in range(tree.LINKS):
         n1,n2 = get_nodes(l, tree.link_dict)
 
@@ -435,33 +448,6 @@ def path_model(tree: Proxytree, cqm: dimod.ConstrainedQuadraticModel,
             )
 
 
-        # -------------------------------------------------
-        # Based on structure formation, n1 will always be a switch
-        # if structure changes, this will be the new conditions
-        # structure.
-        # -------------------------------------------------
-        # if n1 < proxytree.SWITCHES:
-        #     path_cqm.add_constraint(
-        #         on["on" + str(n1) + "-" + str(n2)] 
-        #         - switch_status[n1] 
-        #         <= 0, label="C18-N"+str(l))
-        # else:
-        #     path_cqm.add_constraint(
-        #         on["on" + str(n1) + "-" + str(n2)] 
-        #         - cqm_best[0].get("s"+str(n1-SWITCHES)) 
-        #         <= 0, label="C18-N"+str(l))
-        # if n2 < proxytree.SWITCHES:
-        #     path_cqm.add_constraint(
-        #         on["on" + str(n1) + "-" + str(n2)] 
-        #         - switch_status[n2] 
-        #         <= 0, label="C19-N"+str(l))
-        # else:
-        #     path_cqm.add_constraint(
-        #         on["on" + str(n1) + "-" + str(n2)] 
-        #         - cqm_best[0].get("s"+str(n2-SWITCHES)) 
-        #         == 0, label="C19-N"+str(l))
-
-
 
 def full_model(tree: Proxytree, cqm: dimod.ConstrainedQuadraticModel):
     '''
@@ -471,12 +457,10 @@ def full_model(tree: Proxytree, cqm: dimod.ConstrainedQuadraticModel):
         - tree (Proxytree): the tree structure to generate the model
             type: Proxytree
         - cqm (ConstrainedQuadraticModel): the CQM to create
-    
-    Returns:
-        - null
     '''
     
 
+    #______________________________________________________________________________________
     # Variables
     server_status = [
         dimod.Binary("s{}".format(s)) 
@@ -507,14 +491,13 @@ def full_model(tree: Proxytree, cqm: dimod.ConstrainedQuadraticModel):
                 on["on{}-{}".format(n1, n2)] = dimod.Binary("on{}-{}".format(n1, n2))
 
 
+    #______________________________________________________________________________________
     # Objective
-    # 1
     obj1 = dimod.quicksum(
         server_status[s] 
         * tree.idle_powcons[s+tree.SWITCHES] 
         for s in range(tree.SERVERS)
     )
-    # 2
     obj2 = dimod.quicksum(
         tree.dyn_powcons[s+tree.SWITCHES] 
         * dimod.quicksum(
@@ -523,13 +506,11 @@ def full_model(tree: Proxytree, cqm: dimod.ConstrainedQuadraticModel):
             for vm in range(tree.VMS)
         ) for s in range(tree.SERVERS)
     )
-    # 3
     obj3 = dimod.quicksum(
         switch_status[sw] 
         * tree.idle_powcons[sw] 
         for sw in range(tree.SWITCHES)
     )
-    # 4
     obj4 = dimod.quicksum(
         tree.dyn_powcons[sw] 
         * (
@@ -541,12 +522,13 @@ def full_model(tree: Proxytree, cqm: dimod.ConstrainedQuadraticModel):
         for sw in range(tree.SWITCHES) 
         if tree.adjancy_list[n][sw] == 1
     )
-    # Total
+
     cqm.set_objective(obj1 + obj2 + obj3 + obj4)
 
 
-    # Constraints
-    # (11)     
+    #______________________________________________________________________________________
+    # Constraints [Numbers refer to mathematical model formulas numbers on the paper]
+    # (3)     
     for s in range(tree.SERVERS):
         cqm.add_constraint(
             dimod.quicksum(
@@ -560,7 +542,7 @@ def full_model(tree: Proxytree, cqm: dimod.ConstrainedQuadraticModel):
             label="C11-N{}".format(s)
         )
 
-    # (12)
+    # (4)
     for vm in range(tree.VMS):
         cqm.add_constraint(
             dimod.quicksum(
@@ -571,8 +553,7 @@ def full_model(tree: Proxytree, cqm: dimod.ConstrainedQuadraticModel):
             label="C12-N{}".format(vm)
         )
         
-    # Constraints
-    # (13)
+    # (5)
     for f in range(tree.FLOWS):
         for s in range(tree.SWITCHES, tree.SWITCHES + tree.SERVERS):           # Start from switches cause nodes are numerated in order -> all switches -> all servers
             cqm.add_constraint( 
@@ -586,7 +567,7 @@ def full_model(tree: Proxytree, cqm: dimod.ConstrainedQuadraticModel):
                 label="C13-N{}".format(f*tree.SERVERS+s)
             )
 
-    # (14) 
+    # (6) 
     for f in range(tree.FLOWS):
         for s in range(tree.SWITCHES, tree.SWITCHES + tree.SERVERS):
             cqm.add_constraint( 
@@ -600,7 +581,7 @@ def full_model(tree: Proxytree, cqm: dimod.ConstrainedQuadraticModel):
                 label="C14-N{}".format(f*tree.SERVERS+s)
             ) 
 
-    # (15)     
+    # (7)     
     for f in range(tree.FLOWS):
         for s in range(tree.SWITCHES, tree.SWITCHES + tree.SERVERS):
             cqm.add_constraint( 
@@ -622,7 +603,7 @@ def full_model(tree: Proxytree, cqm: dimod.ConstrainedQuadraticModel):
                 label="C15-N{}".format(f*tree.SERVERS+s)
             )
 
-    # (16)
+    # (8)
     for sw in range(tree.SWITCHES):
         for f in range(tree.FLOWS):
             cqm.add_constraint( 
@@ -640,7 +621,7 @@ def full_model(tree: Proxytree, cqm: dimod.ConstrainedQuadraticModel):
                 label="C16-N{}".format(sw*tree.FLOWS+f)
             )
 
-    # (17)      
+    # (9)      
     for l in range(tree.LINKS):
         n1,n2 = get_nodes(l, tree.link_dict)
         cqm.add_constraint( 
@@ -657,7 +638,7 @@ def full_model(tree: Proxytree, cqm: dimod.ConstrainedQuadraticModel):
             label="C17-N{}".format(l)
         )
 
-    # (18)(19)       
+    # (10)(11)       
     for l in range(tree.LINKS):
         n1,n2 = get_nodes(l, tree.link_dict)
 
@@ -682,277 +663,3 @@ def full_model(tree: Proxytree, cqm: dimod.ConstrainedQuadraticModel):
                 <= 0,
                 label="C19-N{}".format(l)
             )
-
-
-
-################################################################################################
-#                                 LEGACY - UNUSED CODE                                         #
-################################################################################################
-
-import hybrid
-
-
-def check_bqm_feasible(bqm_solution: dict, cqm_model: dimod.ConstrainedQuadraticModel, 
-            inverter: dimod.constrained.CQMToBQMInverter):
-    '''
-    Checks if given sampleset is feasible for the given CQM.
-
-    Args:
-        - bqm_solution: the sampleset to check 
-            type: sampleset
-        - cqm_model: the CQM for checking 
-            type: ConstrainedQuadraticModel
-        - inverter: the converter from the BQM to the CQM 
-            type: CQMToBQMInverter
-    
-    Returns:
-        - null
-    '''
-    inverted_sample = inverter(bqm_solution)
-    
-    print("\n\n## Converted Variables ##")
-
-    last_char = ""
-    for var, value in inverted_sample.items():
-        if last_char != var[0]:         # Var separator
-            print(end="\n")
-        if value != 0.0:                # Nonzero var printer
-            print(var, value, sep = ": ",end= " | ")
-        last_char = var[0]          # Update last char to separate vars
-    
-    print("\n\nFeasible: ", cqm_model.check_feasible(inverted_sample))
-
-
-
-def cqm_solver(cqm_problem: dimod.ConstrainedQuadraticModel, problem_label: str, 
-            save = False):
-    '''
-    Solves the CQM problem using a CQM Hybrid Solver and returns
-    the results.
-
-    Args:
-        - cqm_problem (ConstrainedQuadraticModel): the BQM to 
-        solve
-        - problem_label (str): the problem label
-        - save (bool, optional, default=False): save option
-        for the dictionary
-
-    Returns:
-        - Tuple: containing the solution's dictionary
-        and its execution time
-            type: tuple(dict(), int)
-    '''
-    
-    # Create Sampler
-    sampler = dwave.system.LeapHybridCQMSampler()
-
-    # Sample results
-    sampleset = sampler.sample_cqm(cqm_problem, label = problem_label)
-
-    # Exec time
-    exec_time = sampleset.info.get('run_time')
-    print("CQM TIME: ", exec_time, " micros")
-
-    # Extract feasible solution
-    feasible_sampleset = sampleset.filter(lambda sample: sample.is_feasible)
-
-    # Extract best solution and energy
-    best_solution = feasible_sampleset.first[0]
-    energy = feasible_sampleset.first[1]
-
-    # Energy
-    print("CQM ENERGY: ", str(energy))
-
-    # Extract variables
-    print("\n## CQM Variables ##")
-    last_char = ""
-    for var, value in best_solution.items():
-        if last_char != var[0]:         # Var separator
-            print(end="\n")
-        if value != 0.0:                # Nonzero var printer
-            print(var, value, sep = ": ",end= " | ")
-        last_char = var[0]          # Update last char to separate vars
-    print(end= "\n")
-    # Save best solution
-    if save:
-        with open(("cqm_dict_"+problem_label+".txt"), "w") as fp:
-            json.dump(best_solution, fp)
-            print(problem_label+" dictionary updated!")
-
-    return (best_solution, exec_time)
-
-
-
-def bqm_solver(bqm_problem: dimod.BinaryQuadraticModel, problem_label: str, 
-            cqm_time = 0, time_mult = 1):
-    '''
-    Solves the BQM problem using decomposition and returns
-    the result.
-
-    Args:
-        - bqm_problem (BinaryQuadraticModel): the BQM to 
-        solve
-        - problem_label (str): the problem label
-        - cqm_time (int, optional, default=0): cqm time
-        to compute custom resolve time
-        - time_mult (int, optional, default=1): custom
-        time multiplier for resolve time
-
-    Returns:
-        - best_solution: the solution's dictionary
-            type: dict()
-    '''   
-    # Roof Duality
-    # rf_energy, rf_variables = dwave.preprocessing.roof_duality(vm_bqm)
-    # print("Roof Duality variables: ", rf_variables)
-
-    # Create Sampler
-    sampler = dwave.system.LeapHybridSampler()
-
-    # Sample Results
-    if cqm_time:
-        sampleset = sampler.sample(bqm_problem, cqm_time//10**6 *time_mult, label = problem_label)
-    else:
-        sampleset = sampler.sample(bqm_problem, label = problem_label)
-
-    # Exec Time
-    exec_time = sampleset.info.get('run_time')
-    print("BQM TIME: ", exec_time, " micros")
-
-    # Extract best solution & energy
-    best_solution = sampleset.first[0]
-    energy = sampleset.first[1]
-
-    # Energy
-    print("BQM ENERGY: ", energy)
-    # print("Roof Duality Energy: ", rf_energy)
-
-    # Extract variables
-    print("\n## BQM Variables ##")
-    last_char = ""
-    for var, value in best_solution.items():
-        if last_char != var[0]:         # Var separator
-            print(end="\n")
-        if value != 0.0:                # Nonzero var printer
-            print(var, value, sep = ": ",end= " | ")
-        last_char = var[0]          # Update last char to separate vars
-    print(end= "\n")
-    
-    return best_solution
-
-
-
-def merge_substates(_, substates):
-    '''
-    Minimal function to merge substates in a multiple
-    substates per cycle environment
-    '''
-
-    a, b = substates
-    return a.updated(subsamples=hybrid.hstack_samplesets(a.subsamples, b.subsamples))
-
-
-
-def decomposed_solver(bqm_problem: dimod.BinaryQuadraticModel, problem_label: str):
-    '''
-    Solves the BQM problem using decomposition and returns
-    the result.
-
-    Args:
-        - bqm_problem (BinaryQuadraticModel): the BQM to 
-        solve
-        - problem_label (str): the problem label
-        - cqm_time (int, optional, default=0): cqm time
-        to compute custom resolve time
-        - time_mult (int, optional, default=1): custom
-        time multiplier for resolve time
-
-    Returns:
-        - best_solution: the solution's dictionary
-            type: dict()
-    '''
-    # Decomposer
-    decomposer = hybrid.ComponentDecomposer()
-    decomposer_random = hybrid.RandomSubproblemDecomposer(size= 10)
-    # decomposer = hybrid.Unwind( 
-    #                 hybrid.SublatticeDecomposer()
-    #             )
-
-    # Subsampler
-    qpu = dwave.system.DWaveSampler()
-    subsampler = hybrid.QPUSubproblemAutoEmbeddingSampler(
-                    qpu_sampler=qpu
-    )
-    # subsampler = hybrid.Map(
-    #                     hybrid.QPUSubproblemAutoEmbeddingSampler(
-    #                         qpu_sampler= qpu,
-    #                     )
-    #             ) | hybrid.Reduce (
-    #                     hybrid.Lambda(merge_substates)
-    #             )
-    
-    # Composer
-    composer = hybrid.SplatComposer()
-    
-    # Parallel solvers
-    classic_branch = hybrid.InterruptableTabuSampler() 
-    
-    # Merger
-    merger = hybrid.ArgMin()
-    # merger = hybrid.GreedyPathMerge()    
-
-    # Branch
-    qpu_branch = (decomposer | subsampler | composer) | hybrid.TrackMin(output= True)   # pylint: disable=unsupported-binary-operation
-    random_branch = (decomposer_random | subsampler | composer) | hybrid.TrackMin(output= True) # pylint: disable=unsupported-binary-operation
-    parallel_branches = hybrid.RacingBranches(
-                    classic_branch, 
-                    qpu_branch,
-                    random_branch,
-                    ) | merger
-
-    # Define workflow
-    workflow = hybrid.LoopUntilNoImprovement(
-                        parallel_branches, 
-                        # convergence= 3, 
-                        # max_iter= 5, 
-                        max_time= 3,
-                        )
-
-    # Solve
-    origin_embeddings = hybrid.make_origin_embeddings(qpu, )
-    init_state = hybrid.State.from_sample(
-                        hybrid.random_sample(bqm_problem), 
-                        bqm_problem,
-                        origin_embeddings= origin_embeddings)
-    solution = workflow.run(init_state).result()
-
-    # Print timers
-    # hybrid.print_counters(workflow)
-
-    # Extract best solution & energy
-    best_solution = solution.samples.first[0]
-    energy = solution.samples.first[1]
-
-    # Energy
-    print("Decomposer BQM ENERGY: ", energy)
-
-    # Extract variables
-    print("\n## Decomposer BQM Variables ##")
-    last_char = ""
-    for var, value in best_solution.items():
-        if last_char != var[0]:         # Var separator
-            print(end="\n")
-        if value != 0.0:                # Nonzero var printer
-            print(var, value, sep = ": ",end= " | ")
-        last_char = var[0]          # Update last char to separate vars
-    print(end= "\n")
-    
-    # Extract infos
-    print("\n\n## Decomposer BQM Extra Info ##")
-    print(solution.info)
-    # print(solution)
-    
-
-    return best_solution
-    
-

@@ -1,19 +1,18 @@
-DEBUG = False
+#================================================================================================================================
+# Imports 
+#================================================================================================================================
 
-'''
-TODO
-    - run tests
-'''
-
-
-"""------------------- IMPORTS ---------------------"""
 # D_WAVE
 import dimod
 
 # CUSTOM
 from structures import *
 from fun_lib_DWAVE import *
-"""--------------------------------------------------"""
+
+
+#================================================================================================================================
+# Constants & Managers 
+#================================================================================================================================
 
 proxytree = Proxytree(
                 depth = 2, 
@@ -28,7 +27,7 @@ proxytree = Proxytree(
 manager = CQMmanager(
                 save_solution_vm = True, 
                 save_info_vm = True, 
-                # load_solution = True, 
+                # load_solution = True,     # Uncommet to load solution from saved files
                 save_solution_path = True, 
                 save_info_path = True,
                 save_solution_full = True,
@@ -36,6 +35,7 @@ manager = CQMmanager(
             )
 
 ITERATIONS = 5
+DEBUG = False
 
 
 if DEBUG:   
@@ -43,21 +43,25 @@ if DEBUG:
     manager.print_manager()
 
 
-# ###################################################################
-# |                       VM MODEL                                  |
-# ###################################################################
-print_section("VM Model")
+#================================================================================================================================
+# Splitted Model 
+#================================================================================================================================
 
-# Create problem
+#==========
+# VM Model |
+#==========
+# Create and fill
 vm_cqm = dimod.ConstrainedQuadraticModel()
-# Variables & Constraints
 vm_model(proxytree, vm_cqm)
 
 if DEBUG: print_model_structure("vm model", vm_cqm)
 
-# Solve
+
 for _ in range(ITERATIONS):
-    vm_cqm_solution, vm_cqm_info = detailed_cqm_solver(vm_cqm, "vm_model", 
+    
+    # Solve
+    print_section("VM Model")
+    vm_cqm_solution, vm_cqm_info = cqm_solver(vm_cqm, "vm_model", 
                         proxytree.DEPTH, save_solution = manager.SAVE_VM_SOL,
                         save_info= manager.SAVE_VM_INFO)
 
@@ -65,21 +69,19 @@ for _ in range(ITERATIONS):
 
 
 
-    # ###################################################################
-    # |                       PATH MODEL                                |
-    # ###################################################################
-    print_section("Path Model")
-
-    # Create problem
+    #============
+    # Path Model |
+    #============
+    # Create and fill
     path_cqm = dimod.ConstrainedQuadraticModel()
-    # Variables & Constraints
     path_model(proxytree, path_cqm, vm_solution = vm_cqm_solution, 
             load = manager.LOAD_SOL)
 
     if DEBUG: print_model_structure("path model", path_cqm)
 
     # Solve
-    path_cqm_solution, path_cqm_info = detailed_cqm_solver(path_cqm, "path_model", 
+    print_section("Path Model")
+    path_cqm_solution, path_cqm_info = cqm_solver(path_cqm, "path_model", 
                     proxytree.DEPTH, save_solution = manager.SAVE_PATH_SOL,
                     save_info= manager.SAVE_PATH_INFO)
 
@@ -87,21 +89,20 @@ for _ in range(ITERATIONS):
 
 
 
-# ###################################################################
-# |                       FULL MODEL                                |
-# ###################################################################
-print_section("Full Model")
-
-# Create problem
+#================================================================================================================================
+# Full Model
+#================================================================================================================================
+# Create and fill
 full_cqm = dimod.ConstrainedQuadraticModel()
-# Variables & Constraints
 full_model(proxytree, full_cqm)
 
 if DEBUG: print_model_structure("path model", full_cqm)
 
-# Solve
 for _ in range(ITERATIONS):
-    full_cqm_solution, full_cqm_info = detailed_cqm_solver(full_cqm, "full_model", 
+    
+    # Solve
+    print_section("Full Model")
+    full_cqm_solution, full_cqm_info = cqm_solver(full_cqm, "full_model", 
                     proxytree.DEPTH, save_solution = manager.SAVE_FULL_SOL,
                     save_info= manager.SAVE_FULL_INFO)
 
