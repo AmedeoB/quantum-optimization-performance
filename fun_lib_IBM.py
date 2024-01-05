@@ -1,9 +1,10 @@
+#================================================================================================================================
+# Imports
+#================================================================================================================================
+
 # DOCPLEX
 from docplex.cp.model import CpoModel, minimize
 from docplex.cp.solution import CpoSolveResult
-from docplex.cp.solver.solver_listener import AutoStopListener 
-from docplex.cp.parameters import CpoParameters
-# import cplex
 
 # OTHER
 import json
@@ -12,7 +13,19 @@ import json
 from structures import *
 
 
+
+#================================================================================================================================
+# Functions
+#================================================================================================================================
+
 def to_dictionary(solution: CpoSolveResult):
+    """
+    A function to convert a CpoSolveResult object into a dictionary 
+    using names as keys and values as values.
+
+    Args:
+        - solution (CpoSolveResult): the solution found by the solver
+    """
     
     dictionary = {}
     for var in solution.get_all_var_solutions():
@@ -23,30 +36,42 @@ def to_dictionary(solution: CpoSolveResult):
     return sorted_dictionary
 
 
+
 def cplex_solver(model: CpoModel, depth: int, problem_label: str,
-                 exec_time: int, save_solution = False):
+                 exec_time: int, workers: int, save_solution = False, 
+                 first_solution = False) -> dict:
+    """
+    A function to solve a CpoModel, print its solution and store it
+    as well as its computational time and the objective value.
 
-    # model.add_solver_listener(AutoStopListener(
-    #                             # qsc_time= min(2**depth, exec_time//10),
-    #                             # qsc_time= exec_time,
-    #                             # min_sols= 1,
-    #                             max_sols=2,
-    #                         )
-    #                     )
+    Args:
+        - model (CpoModel): problem to solve
+        - depth (int): the tree depth
+        - problem_label (str): problem name
+        - exec_time (int): maximum solving time
+        - workers (int): number of workers
+        - save_solution (bool, optional, default=False): option to overwrite 
+            problem's solution
+        - first_solution (bool, optional, default=False): execution option,
+            True -> First Solution Found (Still time restrained) | False -> only Time Restrained
 
-    # c = cplex.Cplex()
-    # c.parameters.parallel = -1
-    # c.parameters.lpmethod = cplex.Cplex.parameters.lpmethod.values.barrier
+    Returns:
+        - (dict): solution dictionary containing variables solutions
+    """
 
-    # c = CpoParameters()
-    # c.set_attribute('parallel', -1)
 
     print("Solving...")
-    solution = model.solve(
-                    TimeLimit= exec_time,
-                    SolutionLimit= 1,
-                    Workers= 4,
-                )
+    if first_solution:
+        solution = model.solve(
+                        TimeLimit= exec_time,
+                        SolutionLimit= 1,
+                        Workers= workers,
+                    )
+    else:
+        solution = model.solve(
+                        TimeLimit= exec_time,
+                        Workers= workers,
+                    )
 
     print(
         f"\n# SOLUTION #\n"
@@ -57,11 +82,13 @@ def cplex_solver(model: CpoModel, depth: int, problem_label: str,
 
     print("\n# VARIABLES \n")    
     if solution.is_solution():
+        # Convert solution to dictionary and print it
         sol_dictionary = to_dictionary(solution)
         for key, val in sol_dictionary.items():
             if val != 0:
                 print(f"{key}: {val}")
     else:   
+        # If there's no solution, don't save
         sol_dictionary = {}
         save_solution = False
 
@@ -79,12 +106,20 @@ def cplex_solver(model: CpoModel, depth: int, problem_label: str,
     info_writer(dictionary, f"IBM LOGS/depth_{depth}/{problem_label}_info.txt")
 
 
-
     return sol_dictionary
 
 
+
 def vm_cplex_model(model: CpoModel, tree: Proxytree):
-    
+    """
+    Creates the VM Assignment problem.
+
+    Args:
+        - model (CpoModel): the model to fill
+        - tree (Proxytree): the tree topology
+    """
+
+    #______________________________________________________________________________________
     # Variables
     server_status = [
         model.binary_var(name= "s{}".format(s)) # pylint: disable=no-member
@@ -97,8 +132,9 @@ def vm_cplex_model(model: CpoModel, tree: Proxytree):
         ] for s in range(tree.SERVERS)
     ]
 
-    # Constraints
-    # (11)
+    #______________________________________________________________________________________
+    # Constraints [Numbers refer to mathematical model formulas numbers on the paper]
+    # (3)
     for s in range(tree.SERVERS):
         model.add_constraint(
             sum(
@@ -108,7 +144,7 @@ def vm_cplex_model(model: CpoModel, tree: Proxytree):
             - (tree.server_capacity[s] * server_status[s])
             <= 0
         )
-    # (12)
+    # (4)
     for vm in range(tree.VMS):
         model.add_constraint(
             sum(
@@ -118,6 +154,7 @@ def vm_cplex_model(model: CpoModel, tree: Proxytree):
             == 1
         )
 
+    #______________________________________________________________________________________
     # Objective
     model.add(
         minimize(
@@ -137,8 +174,18 @@ def vm_cplex_model(model: CpoModel, tree: Proxytree):
     )    
 
 
-def path_cplex_model(model: CpoModel, tree: Proxytree, vm_solution: dict):
 
+def path_cplex_model(model: CpoModel, tree: Proxytree, vm_solution: dict):
+    """
+    Creates the Path Planning problem.
+
+    Args:
+        - model (CpoModel): the model to fill
+        - tree (Proxytree): the tree topology
+        - vm_solution (dict): a dictionary containing the VM Assignment solution
+    """
+
+    #______________________________________________________________________________________
     # Variables
     switch_status = [
         model.binary_var(name= "sw{}".format(sw)) # pylint: disable=no-member
@@ -159,8 +206,9 @@ def path_cplex_model(model: CpoModel, tree: Proxytree, vm_solution: dict):
                 on["on{}-{}".format(n1, n2)] = model.binary_var("on{}-{}".format(n1, n2))
 
 
-    # Constraints
-    # (13)
+    #______________________________________________________________________________________
+    # Constraints [Numbers refer to mathematical model formulas numbers on the paper]
+    # (5)
     for f in range(tree.FLOWS):
         for s in range(tree.SWITCHES, tree.SWITCHES + tree.SERVERS):           # Start from switches cause nodes are numerated in order -> all switches -> all servers
             if vm_solution.get("vm{}-s{}".format(tree.src_dst[f][0], s-tree.SWITCHES)) == 0:
@@ -173,7 +221,7 @@ def path_cplex_model(model: CpoModel, tree: Proxytree, vm_solution: dict):
                     == 0
                 )
 
-    # (14)
+    # (6)
     for f in range(tree.FLOWS):
         for s in range(tree.SWITCHES, tree.SWITCHES + tree.SERVERS):           # Start from switches cause nodes are numerated in order -> all switches -> all servers
             if vm_solution.get("vm{}-s{}".format(tree.src_dst[f][1], s-tree.SWITCHES)) == 0:
@@ -186,7 +234,7 @@ def path_cplex_model(model: CpoModel, tree: Proxytree, vm_solution: dict):
                     == 0
                 )
 
-    # (15)
+    # (7)
     for f in range(tree.FLOWS):
         for s in range(tree.SWITCHES, tree.SWITCHES + tree.SERVERS):
             model.add_constraint( 
@@ -207,7 +255,7 @@ def path_cplex_model(model: CpoModel, tree: Proxytree, vm_solution: dict):
                 == 0
             )
 
-    # (16)
+    # (8)
     for sw in range(tree.SWITCHES):
         for f in range(tree.FLOWS):
             model.add_constraint( 
@@ -224,7 +272,7 @@ def path_cplex_model(model: CpoModel, tree: Proxytree, vm_solution: dict):
                 == 0
             )
     
-    # (17)
+    # (9)
     for l in range(tree.LINKS):
         n1,n2 = get_nodes(l, tree.link_dict)
         model.add_constraint( 
@@ -239,7 +287,7 @@ def path_cplex_model(model: CpoModel, tree: Proxytree, vm_solution: dict):
             <= 0
         )
     
-    # (18-19)
+    # (10-11)
     for l in range(tree.LINKS):
         n1,n2 = get_nodes(l, tree.link_dict)
 
@@ -263,6 +311,7 @@ def path_cplex_model(model: CpoModel, tree: Proxytree, vm_solution: dict):
             )
 
 
+    #______________________________________________________________________________________
     # Objective
     model.add(
         minimize(
@@ -285,7 +334,18 @@ def path_cplex_model(model: CpoModel, tree: Proxytree, vm_solution: dict):
     )
 
 
+
 def full_cplex_model(model: CpoModel, tree: Proxytree):
+    """
+    Creates the Full problem.
+
+    Args:
+        - model (CpoModel): the model to fill
+        - tree (Proxytree): the tree topology
+    """
+
+
+    #______________________________________________________________________________________
     # Variables
     server_status = [
         model.binary_var(name= "s{}".format(s)) # pylint: disable=no-member
@@ -315,8 +375,10 @@ def full_cplex_model(model: CpoModel, tree: Proxytree):
             if tree.adjancy_list[n1][n2]:
                 on["on{}-{}".format(n1, n2)] = model.binary_var("on{}-{}".format(n1, n2))
 
-    # Constraints
-    # (11)
+
+    #______________________________________________________________________________________
+    # Constraints [Numbers refer to mathematical model formulas numbers on the paper]
+    # (3)
     for s in range(tree.SERVERS):
         model.add_constraint(
             sum(
@@ -326,7 +388,7 @@ def full_cplex_model(model: CpoModel, tree: Proxytree):
             - (tree.server_capacity[s] * server_status[s])
             <= 0
         )
-    # (12)
+    # (4)
     for vm in range(tree.VMS):
         model.add_constraint(
             sum(
@@ -335,7 +397,7 @@ def full_cplex_model(model: CpoModel, tree: Proxytree):
             )
             == 1
         )
-    # (13)
+    # (5)
     for f in range(tree.FLOWS):
         for s in range(tree.SWITCHES, tree.SWITCHES + tree.SERVERS):           # Start from switches cause nodes are numerated in order -> all switches -> all servers
                 model.add_constraint( 
@@ -348,7 +410,7 @@ def full_cplex_model(model: CpoModel, tree: Proxytree):
                     <= 0
                 )
 
-    # (14)
+    # (6)
     for f in range(tree.FLOWS):
         for s in range(tree.SWITCHES, tree.SWITCHES + tree.SERVERS):           # Start from switches cause nodes are numerated in order -> all switches -> all servers
                 model.add_constraint( 
@@ -361,7 +423,7 @@ def full_cplex_model(model: CpoModel, tree: Proxytree):
                     <= 0
                 )
 
-    # (15)
+    # (7)
     for f in range(tree.FLOWS):
         for s in range(tree.SWITCHES, tree.SWITCHES + tree.SERVERS):
             model.add_constraint( 
@@ -382,7 +444,7 @@ def full_cplex_model(model: CpoModel, tree: Proxytree):
                 == 0
             )
 
-    # (16)
+    # (8)
     for sw in range(tree.SWITCHES):
         for f in range(tree.FLOWS):
             model.add_constraint( 
@@ -399,7 +461,7 @@ def full_cplex_model(model: CpoModel, tree: Proxytree):
                 == 0
             )
     
-    # (17)
+    # (9)
     for l in range(tree.LINKS):
         n1,n2 = get_nodes(l, tree.link_dict)
         model.add_constraint( 
@@ -414,7 +476,7 @@ def full_cplex_model(model: CpoModel, tree: Proxytree):
             <= 0
         )
     
-    # (18-19)
+    # (10-11)
     for l in range(tree.LINKS):
         n1,n2 = get_nodes(l, tree.link_dict)
 
@@ -438,6 +500,7 @@ def full_cplex_model(model: CpoModel, tree: Proxytree):
             )
     
 
+    #______________________________________________________________________________________
     # Objective
     model.add(
         minimize(

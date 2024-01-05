@@ -275,9 +275,17 @@ class CQMmanager():
         - save_info_full (bool, optional, default=False): save 
             full problem info
     '''
-    def __init__(self, save_solution_vm = False, save_info_vm = False, 
-        load_solution = False, save_solution_path = False, save_info_path = False,
-        save_solution_full = False, save_info_full = False):
+    def __init__(
+                self, 
+                save_solution_vm = False, 
+                save_info_vm = False, 
+                load_solution = False, 
+                save_solution_path = False, 
+                save_info_path = False,
+                save_solution_full = False, 
+                save_info_full = False
+            ):
+        
         self.SAVE_VM_SOL = save_solution_vm
         self.SAVE_VM_INFO = save_info_vm
         self.LOAD_SOL = load_solution
@@ -298,6 +306,30 @@ class CQMmanager():
             f"\nSave FULL Info:     {self.SAVE_FULL_INFO}"
         )
         
+
+
+# class IBMmanager():
+#     '''
+#     A class to manage all main_IBM constant
+#     '''
+
+#     def __init__(
+#                 self,
+#                 workers: int,
+#                 vm_time: int,
+#                 path_time: int,
+#                 full_time: int,
+#                 first_solution_mode: bool,
+#                 save_results: bool
+#             ):
+#         self.WORKERS = workers
+#         self.VMTIME = vm_time
+#         self.PATHTIME = path_time
+#         self.FULLTIME = full_time
+#         self.FIRST_SOLUTION_MODE = first_solution_mode
+
+        
+
 
 
 def get_nodes(l, dictionary):
