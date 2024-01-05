@@ -1,3 +1,19 @@
+# TO DO
+- Riscrivere file README.md in inglese ed in sezioni, in particolare:
+- - Sezione IBM
+  - - Main IBM
+    - Funzioni IBM
+  - Sezione DWAVE
+  - - Main DWAVE
+    - Funzioni DWAVE
+  - Sezione funzioni & strutture di appoggio
+- Riscrivere file (riorganizza e in inglese)
+- - IBM main
+  - IBM funzioni
+  - DWAVE main
+  - DWAVE funzioni
+  - funzioni & strutture
+
 # Info
 Questo branch offre una decomposizione del programma in classi e funzioni.
 
