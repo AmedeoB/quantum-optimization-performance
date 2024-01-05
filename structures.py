@@ -15,6 +15,8 @@ class Proxytree():
         - idle_pc (int): idle powcons of nodes *
         - dyn_pc (int): dynamic powcons of nodes *
         - datar_avg (int): the average datarate of flows
+        - random_tree (bool, Optional, default = False): makes the tree
+            structure rand
 
     * will be multiplied by tree levels, changes every level
     '''
@@ -22,42 +24,53 @@ class Proxytree():
     def __init__(self, depth, server_c, link_c, idle_pc, dyn_pc, datar_avg, random_tree = False):        
         self.DEPTH = depth
 
-        self.SERVER_C = server_c               # Server capacity
-        self.LINK_C = link_c*self.DEPTH            # Link capacity
+        self.SERVER_C = server_c                                                    # Server capacity
+        self.LINK_C = link_c*self.DEPTH                                             # Link capacity
         self.LINK_C_DECREASE = 2
-        self.IDLE_PC = idle_pc*self.DEPTH          # Idle power consumption
-        self.IDLE_PC_DECREASE = 5        # Idle power consumption
-        self.DYN_PC = dyn_pc*self.DEPTH            # Dynamic power consumption
-        self.DYN_PC_DECREASE = 1         # Dynamic power consumption
-        # self.REQ_AVG = 8                 # Average flow request           (LEGACY: using randint and server capacity)
-        self.DATAR_AVG = datar_avg               # Average data rate per flow
+        self.IDLE_PC = idle_pc*self.DEPTH                                           # Idle power consumption
+        self.IDLE_PC_DECREASE = 5                                                   # Idle power consumption
+        self.DYN_PC = dyn_pc*self.DEPTH                                             # Dynamic power consumption
+        self.DYN_PC_DECREASE = 1                                                    # Dynamic power consumption
+        self.DATAR_AVG = datar_avg                                                  # Average data rate per flow
 
-        self.SERVERS = pow(2, self.DEPTH)                                 # Server number
-        self.SWITCHES = sum(pow(2,lvl) for lvl in range(self.DEPTH))          # Switch number
-        self.VMS = self.SERVERS                                           # VM number per server
+        self.SERVERS = pow(2, self.DEPTH)                                           # Server number
+        self.SWITCHES = sum(pow(2,lvl) for lvl in range(self.DEPTH))                # Switch number
+        self.VMS = self.SERVERS                                                     # VM number per server
         self.FLOWS = self.VMS//2 if self.VMS%2==0 else self.VMS//2+1                # Flow number
-        self.NODES = self.SERVERS + self.SWITCHES                              # Total Nodes
+        self.NODES = self.SERVERS + self.SWITCHES                                   # Total Nodes
         self.LINKS = 0
         self.__init_links()
 
-        self.server_capacity = [self.SERVER_C for _ in range(self.SERVERS)]           # Capacity of each server
+        self.server_capacity = [self.SERVER_C for _ in range(self.SERVERS)]         # Capacity of each server
         self.link_capacity = []
-        self.idle_powcons = []           # Idle power consumption of each node
-        self.dyn_powcons = []            # Dynamic power of each node
+        self.idle_powcons = []                                                      # Idle power consumption of each node
+        self.dyn_powcons = []                                                       # Dynamic power of each node
         self.__init_link_capacity()
         self.__init_idle_dyn_powcons()
         if random_tree:
-            self.cpu_util = [random.randint(self.SERVER_C//2 +1, self.SERVER_C-1) for _ in range(self.VMS)] # CPU utilization of each VM
-            self.data_rate = [random.randint(self.DATAR_AVG-1 , self.DATAR_AVG+1) for _ in range(self.FLOWS)]      # Data rate of flow f on link l
+            self.cpu_util = [
+                        random.randint(self.SERVER_C//2 +1, self.SERVER_C-1) 
+                        for _ in range(self.VMS)
+                        ]                                                           # CPU utilization of each VM
+            self.data_rate = [
+                        random.randint(self.DATAR_AVG-1 , self.DATAR_AVG+1)
+                        for _ in range(self.FLOWS)
+                        ]                                                           # Data rate of flow f on link l
         else:
-            self.cpu_util = [server_c//2+1 for _ in range(self.VMS)] # CPU utilization of each VM
-            self.data_rate = [datar_avg for _ in range(self.FLOWS)]      # Data rate of flow f on link l 
+            self.cpu_util = [server_c//2+1 for _ in range(self.VMS)]                # CPU utilization of each VM
+            self.data_rate = [datar_avg for _ in range(self.FLOWS)]                 # Data rate of flow f on link l 
         
         self.link_dict = {}
-        self.adjancy_list = [[0 for _ in range(self.NODES)] for _ in range(self.NODES)] 
+        self.adjancy_list = [
+                        [0 for _ in range(self.NODES)] 
+                        for _ in range(self.NODES)
+                        ] 
         self.__init_link_dict_adj_list()
 
-        self.src_dst = [[0 for _ in range(2)] for _ in range(self.FLOWS)]
+        self.src_dst = [
+                    [0 for _ in range(2)] 
+                    for _ in range(self.FLOWS)
+                    ]
         self.__init_src_dst(random_tree)
 
 
@@ -191,70 +204,6 @@ class Proxytree():
 
 
 
-class Proxymanager():
-
-    '''
-    A class to manage all program constant for  time multipliers, 
-    savers, and lagrange multipliers.
-
-    Args:
-        - proxytree (Proxytree): the tree structure to compute lagrange 
-        multipliers
-        - save_cqm_dict (bool, optional, default=False): boolean 
-        to save CQM results
-        - load_cqm_dict (bool, optional, default=False): boolean 
-        to load CQM results
-        - time_mul_vm (int, optional, default=0): time multiplier 
-        for VM BQM solver
-        - time_mul_path (int, optional, default=0): time multiplier 
-        for path BQM solver
-        - lag_mul_vm (int, optional, default=0): multiplier to compute 
-        lagrange multiplier for VM BQM
-        - lag_mul_path (int, optional, default=0): multiplier to 
-        compute lagrange multiplier for path BQM
-    '''
-
-    def __init__(self, proxytree: Proxytree, save_cqm_dict = False, 
-                load_cqm_dict = False, time_mul_vm = 0, time_mul_path = 0, 
-                lag_mul_vm = 0, lag_mul_path = 0):
-                
-        self.SAVE_DICT = save_cqm_dict
-        self.LOAD_DICT = load_cqm_dict
-
-
-        # BQM Time multiplier for VM assignment solver
-        if time_mul_vm:
-            self.VM_CUSTOM_TIME = True
-        else:
-            self.VM_CUSTOM_TIME = False
-        self.VM_TIME_MULT = time_mul_vm 
-
-        # BQM Time multiplier for Path planner solver
-        if time_mul_path:
-            self.PATH_CUSTOM_TIME = True 
-        else:
-            self.PATH_CUSTOM_TIME = False
-        self.PATH_TIME_MULT = time_mul_path           
-        
-
-        # Lagrange multiplier for CQM to BQM conversion for
-            # VM problem | calculated from server idle powcons
-        if lag_mul_vm:
-            self.VM_CUSTOM_LAGRANGE = True 
-        else:
-            self.VM_CUSTOM_LAGRANGE = False 
-        self.VM_LAGRANGE_MUL = int(proxytree.idle_powcons[-1] * lag_mul_vm)
-
-        # Lagrange multiplier for CQM to BQM conversion for
-            # path problem | calculated from server idle powcons
-        if lag_mul_path:
-            self.PATH_CUSTOM_LAGRANGE = True 
-        else:
-            self.PATH_CUSTOM_LAGRANGE = False 
-        self.PATH_LAGRANGE_MUL = int(proxytree.idle_powcons[0] * lag_mul_path)   # Lagrange multiplier for cqm -> bqm path problem conversion | calculated from root switch idle powcons
-
-
-
 class CQMmanager():
     '''
     A class to manage all main_CQM constant
@@ -308,30 +257,6 @@ class CQMmanager():
         
 
 
-# class IBMmanager():
-#     '''
-#     A class to manage all main_IBM constant
-#     '''
-
-#     def __init__(
-#                 self,
-#                 workers: int,
-#                 vm_time: int,
-#                 path_time: int,
-#                 full_time: int,
-#                 first_solution_mode: bool,
-#                 save_results: bool
-#             ):
-#         self.WORKERS = workers
-#         self.VMTIME = vm_time
-#         self.PATHTIME = path_time
-#         self.FULLTIME = full_time
-#         self.FIRST_SOLUTION_MODE = first_solution_mode
-
-        
-
-
-
 def get_nodes(l, dictionary):
     '''
     A function that returns a tuple (n1,n2) containing
@@ -375,7 +300,7 @@ def print_section(section_name: str):
 
 def dict_filter(pair):
     '''
-    Filters an info dictionary extracting only run_time
+    Filters an info dictionary extracting only run_time.
     '''
     key, _ = pair
     return "time" in key 
@@ -384,7 +309,11 @@ def dict_filter(pair):
 
 def info_writer(dictionary: dict, path: str):
     '''
-    Writes solution on a file
+    Writes solution on a file.
+
+    Args:
+        - dictionary (dict): a dictionary to save
+        - path (str): file path
     '''
     writeheads = False
     if not exists(path): writeheads = True
@@ -400,6 +329,3 @@ def info_writer(dictionary: dict, path: str):
         for v in dictionary.values():
             file.write(f"{v}\t")
         file.write("\n")
-
-
-
