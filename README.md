@@ -1,14 +1,14 @@
 # TO DO
 - Riscrivere file README.md in inglese ed in sezioni, in particolare:
-- - Sezione IBM
-  - - Main IBM
+  - Sezione IBM
+    - Main IBM
     - Funzioni IBM
   - Sezione DWAVE
-  - - Main DWAVE
+    - Main DWAVE
     - Funzioni DWAVE
   - Sezione funzioni & strutture di appoggio
 - Riscrivere file (riorganizza e in inglese)
-- - IBM main
+  - IBM main
   - IBM funzioni
   - DWAVE main
   - DWAVE funzioni
