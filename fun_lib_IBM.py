@@ -144,6 +144,7 @@ def vm_cplex_model(model: CpoModel, tree: Proxytree):
             - (tree.server_capacity[s] * server_status[s])
             <= 0
         )
+
     # (4)
     for vm in range(tree.VMS):
         model.add_constraint(
@@ -388,6 +389,7 @@ def full_cplex_model(model: CpoModel, tree: Proxytree):
             - (tree.server_capacity[s] * server_status[s])
             <= 0
         )
+
     # (4)
     for vm in range(tree.VMS):
         model.add_constraint(
@@ -397,6 +399,7 @@ def full_cplex_model(model: CpoModel, tree: Proxytree):
             )
             == 1
         )
+        
     # (5)
     for f in range(tree.FLOWS):
         for s in range(tree.SWITCHES, tree.SWITCHES + tree.SERVERS):           # Start from switches cause nodes are numerated in order -> all switches -> all servers
