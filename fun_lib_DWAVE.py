@@ -1,28 +1,37 @@
 """
-################################### MODEL VARIABLES DICTIONARY ######################################################
-_____________________________________________________________________________________________________________________
-Variable         |  Type         |  Model        |  Description
-_________________|_______________|_______________|___________________________________________________________________
-SERVERS             int             M               number of servers
-VMS                 int             N               number of VM
-SWITCHES            int             K               number of switches
-FLOWS               int             F               number of flows (server-server paths, = M/2)
-LINKS               int             L               number of links (graph links)
-idle_powcons        1D list         p(idle_i/k)     idle power consumption fo each node (i server, k switch)
-dyn_powcons         1D list         p(dyn_i/k)      maximum dynamic power of each node (i server, k switch) 
-adjancy_list        2D list         ---             node's adjancy list
-link_capacity       1D list         C(l)            capacity of each link
-server_capacity     1D list         C(s)            capacity of each server
-src_dst             2D list         ---             list of vms communicating through a path, identifies flows
-server_status       1D list         s(i)            server (i) status, 1 on, 0 off
-switch_status       1D list         sw(k)           switch (k) status, 1 on, 0 off
-vm_status           2D list         v(ji)           VM (j) status per server (i), 1 on, 0 off
-cpu_util            1D array        u(v(ji))        CPU utilization of each VM 
-data_rate           2D array        d(fl)           data rate of flow (f) on link (l)
-flow_path           bin dictionary  ρ(f,(k,i))      se parte del flow (f) va da k a i (nodi), allora 1, 0 altrimenti
-on                  bin dictionary  on(n1, n2)      link between node n1 and n2 is ON                
-_____________________________________________________________________________________________________________________
-#####################################################################################################################
+ __________________________________ MODEL VARIABLES DICTIONARY ______________________________________________________________
+|____________________________________________________________________________________________________________________________|
+|Variable Name          |  Type       |  Model             |  Description                                                    |
+|_______________________|_____________|____________________|_________________________________________________________________|
+| ========================================================================================================================== |
+| Binary Variables |                                                                                                         |
+| =================                                                                                                          |
+| flow_path               dict            p(f,(n1,n2))        part of flow f goes from node n1 to n2 -> 1 | otherwise -> 0   |
+| on                      dict            on(n1, n2)          link between nodes n1 and n2 is ON                             |
+| server_status           1D list         s_{i}               server i status, 1 ON, 0 OFF                                   |
+| switch_status           1D list         sw_{k}              switch k status, 1 ON, 0 OFF                                   |
+| vm_status               2D list         v_{ji}              VM j status on server i, 1 ON, 0 OFF                           |
+| ========================================================================================================================== |
+| Sets |                                                                                                                     |
+| =====                                                                                                                      |
+| FLOWS                   int             F                   number of flows (server-server paths, = M/2)                   |
+| LINKS                   int             L                   number of links (graph links)                                  |
+| NODES                   int             ---                 total number of nodes                                          |
+| SERVERS                 int             M                   number of servers                                              |
+| SWITCHES                int             K                   number of switches                                             |
+| VMS                     int             N                   number of VM                                                   |
+| ========================================================================================================================== |
+| Other Variables |                                                                                                          |
+| ================                                                                                                           |
+| adjancy_list            2D list         ---                 node's adjancy list                                            |
+| cpu_util                1D array        u(v_{ji})           CPU utilization of each VM                                     |
+| data_rate               2D array        d_{f,l}             data rate of flow (f) on link (l)                              |
+| dyn_powcons             1D list         P^{dyn}_{i}         maximum dynamic power of each node (i server, k switch)        |
+| idle_powcons            1D list         P^{idle}_{i}        idle power consumption fo each node (i server, k switch)       |
+| link_capacity           1D list         C_{l}               capacity of each link                                          |
+| server_capacity         1D list         C_{s}               capacity of each server                                        |
+| src_dst                 2D list         ---                 list of vms communicating through a path, identifies flows     |
+|____________________________________________________________________________________________________________________________|
 """
 #================================================================================================================================
 # Imports 
@@ -41,14 +50,6 @@ from structures import *
 
 
 #================================================================================================================================
-# Constants & Managers 
-#================================================================================================================================
-
-DEBUG = False
-
-
-
-#================================================================================================================================
 # Functions 
 #================================================================================================================================
 
@@ -58,11 +59,11 @@ def print_model_structure(name: str, model: dimod.ConstrainedQuadraticModel,
     Simple function to print cqm model structure.
 
     Args:
-        name (str): name of the cqm model
-        model (ConstrainedQuadraticModel): CQM
-        columns (int, optional, default = 10): print columns for 
-        dictionary
+        - name (str): name of the cqm model
+        - model (ConstrainedQuadraticModel): CQM Model
+        - columns (int, optional, default = 10): print columns
     '''
+
     print(
         f"\n# {name.upper()} STRUCTURE #"
         f"\nLinear Variables:       {model.num_variables()}"
@@ -99,10 +100,11 @@ def print_cqm_extrainfo(sample: set, infoset: set, columns = 10):
     Simple function to print cqm sample infos.
 
     Args:
-        sample (set): solution sample
-        infoset (set): extra info set
-        columns (int, optional, default = 10): print columns 
+        - sample (set): solution sampleset
+        - infoset (set): extra info set
+        - columns (int, optional, default = 10): print columns 
     '''
+
     zeroprinter = "\n# VARIABLES OFF #\n"
     activeprinter = "\n# VARIABLES ON #\n"
     zerocols, activecols = 0, 0
@@ -140,14 +142,13 @@ def cqm_solver(cqm_problem: dimod.ConstrainedQuadraticModel, problem_label: str,
     the results.
 
     Args:
-        - cqm_problem (ConstrainedQuadraticModel): the BQM to 
-        solve
-        - problem_label (str): the problem label
+        - cqm_problem (ConstrainedQuadraticModel): BQM to solve
+        - problem_label (str): problem label
         - depth (int): tree depth, for saving purposes
         - save_solution (bool, optional, default=False): save option
-        for the solution dictionary
+            for the solution dictionary
         - save_info (bool, optional, default=False): save option
-        for the info dictionary
+            for the info dictionary
 
     Returns:
         - Tuple: containing the solution sample and execution info
@@ -180,7 +181,8 @@ def cqm_solver(cqm_problem: dimod.ConstrainedQuadraticModel, problem_label: str,
         # No solution found, give sample values
         best_solution = {}
         energy = 0.0
-        
+
+    # Save solution info (energy & times)    
     if save_info:
         new_dict = dict(filter(dict_filter, problem_info.items()))
         for k,v in new_dict.items():
@@ -189,7 +191,7 @@ def cqm_solver(cqm_problem: dimod.ConstrainedQuadraticModel, problem_label: str,
         path = f"DWAVE LOGS/depth_{depth}/{problem_label}_info.txt"
         info_writer(new_dict, path)
 
-    # Print
+    # Print solution infos
     print(
         f"\n# CQM SOLUTION #"
         f"\nCQM EXEC TIME:  {exec_time} micros"
@@ -280,7 +282,7 @@ def path_model(tree: Proxytree, cqm: dimod.ConstrainedQuadraticModel,
         - tree (Proxytree): the tree structure to generate the model
         - cqm (ConstrainedQuadraticModel): the CQM to create
         - vm_solution (tuple(dict, int)): the previous VM assignment solution
-        - load (bool): boolean var for loading saved results
+        - load (bool, optional, default= False): boolean var for loading saved results
     '''
     
     #______________________________________________________________________________________
@@ -528,7 +530,7 @@ def full_model(tree: Proxytree, cqm: dimod.ConstrainedQuadraticModel):
 
     #______________________________________________________________________________________
     # Constraints [Numbers refer to mathematical model formulas numbers on the paper]
-    # (3)     
+    # (3) For each server, the CPU utilization of each VM on that server must be less or equal than server's capacity            
     for s in range(tree.SERVERS):
         cqm.add_constraint(
             dimod.quicksum(
@@ -542,7 +544,7 @@ def full_model(tree: Proxytree, cqm: dimod.ConstrainedQuadraticModel):
             label="C11-N{}".format(s)
         )
 
-    # (4)
+    # (4) For each VM, it must be active on one and only one server
     for vm in range(tree.VMS):
         cqm.add_constraint(
             dimod.quicksum(
@@ -553,7 +555,7 @@ def full_model(tree: Proxytree, cqm: dimod.ConstrainedQuadraticModel):
             label="C12-N{}".format(vm)
         )
         
-    # (5)
+    # (5) For each flow and server, the sum of exiting flow from the server to all adj switch is <= than vms part of that flow
     for f in range(tree.FLOWS):
         for s in range(tree.SWITCHES, tree.SWITCHES + tree.SERVERS):           # Start from switches cause nodes are numerated in order -> all switches -> all servers
             cqm.add_constraint( 
@@ -567,7 +569,7 @@ def full_model(tree: Proxytree, cqm: dimod.ConstrainedQuadraticModel):
                 label="C13-N{}".format(f*tree.SERVERS+s)
             )
 
-    # (6) 
+    # (6) For each flow and server, the sum of entering flow from the server to all adj switch is <= than vms part of that flow
     for f in range(tree.FLOWS):
         for s in range(tree.SWITCHES, tree.SWITCHES + tree.SERVERS):
             cqm.add_constraint( 
@@ -581,7 +583,7 @@ def full_model(tree: Proxytree, cqm: dimod.ConstrainedQuadraticModel):
                 label="C14-N{}".format(f*tree.SERVERS+s)
             ) 
 
-    # (7)     
+    # (7) For each flow and server, force allocation of all flows     
     for f in range(tree.FLOWS):
         for s in range(tree.SWITCHES, tree.SWITCHES + tree.SERVERS):
             cqm.add_constraint( 
@@ -603,7 +605,7 @@ def full_model(tree: Proxytree, cqm: dimod.ConstrainedQuadraticModel):
                 label="C15-N{}".format(f*tree.SERVERS+s)
             )
 
-    # (8)
+    # (8) For each switch and flow, entering and exiting flow from the switch are equal
     for sw in range(tree.SWITCHES):
         for f in range(tree.FLOWS):
             cqm.add_constraint( 
@@ -621,7 +623,7 @@ def full_model(tree: Proxytree, cqm: dimod.ConstrainedQuadraticModel):
                 label="C16-N{}".format(sw*tree.FLOWS+f)
             )
 
-    # (9)      
+    # (9) For each link, the data rate on it is less or equal than its capacity      
     for l in range(tree.LINKS):
         n1,n2 = get_nodes(l, tree.link_dict)
         cqm.add_constraint( 
@@ -638,7 +640,7 @@ def full_model(tree: Proxytree, cqm: dimod.ConstrainedQuadraticModel):
             label="C17-N{}".format(l)
         )
 
-    # (10)(11)       
+    # (10)(11) For each link, the link is ON only if both nodes are ON       
     for l in range(tree.LINKS):
         n1,n2 = get_nodes(l, tree.link_dict)
 

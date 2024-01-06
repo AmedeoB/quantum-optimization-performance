@@ -34,11 +34,11 @@ manager = CQMmanager(
                 save_info_full = True
             )
 
-ITERATIONS = 5
-DEBUG = False
+ITERATIONS = 5          # How much times the problem is solved from start to finish
+VERBOSE = False          
 
 
-if DEBUG:   
+if VERBOSE:   
     proxytree.print_tree()
     manager.print_manager()
 
@@ -54,7 +54,7 @@ if DEBUG:
 vm_cqm = dimod.ConstrainedQuadraticModel()
 vm_model(proxytree, vm_cqm)
 
-if DEBUG: print_model_structure("vm model", vm_cqm)
+if VERBOSE: print_model_structure("vm model", vm_cqm)
 
 
 for _ in range(ITERATIONS):
@@ -65,7 +65,7 @@ for _ in range(ITERATIONS):
                         proxytree.DEPTH, save_solution = manager.SAVE_VM_SOL,
                         save_info= manager.SAVE_VM_INFO)
 
-    if DEBUG:   print_cqm_extrainfo(vm_cqm_solution, vm_cqm_info)
+    if VERBOSE:   print_cqm_extrainfo(vm_cqm_solution, vm_cqm_info)
 
 
 
@@ -77,7 +77,7 @@ for _ in range(ITERATIONS):
     path_model(proxytree, path_cqm, vm_solution = vm_cqm_solution, 
             load = manager.LOAD_SOL)
 
-    if DEBUG: print_model_structure("path model", path_cqm)
+    if VERBOSE: print_model_structure("path model", path_cqm)
 
     # Solve
     print_section("Path Model")
@@ -85,7 +85,7 @@ for _ in range(ITERATIONS):
                     proxytree.DEPTH, save_solution = manager.SAVE_PATH_SOL,
                     save_info= manager.SAVE_PATH_INFO)
 
-    if DEBUG:   print_cqm_extrainfo(path_cqm_solution, path_cqm_info)
+    if VERBOSE:   print_cqm_extrainfo(path_cqm_solution, path_cqm_info)
 
 
 
@@ -96,7 +96,7 @@ for _ in range(ITERATIONS):
 full_cqm = dimod.ConstrainedQuadraticModel()
 full_model(proxytree, full_cqm)
 
-if DEBUG: print_model_structure("path model", full_cqm)
+if VERBOSE: print_model_structure("path model", full_cqm)
 
 for _ in range(ITERATIONS):
     
@@ -106,4 +106,4 @@ for _ in range(ITERATIONS):
                     proxytree.DEPTH, save_solution = manager.SAVE_FULL_SOL,
                     save_info= manager.SAVE_FULL_INFO)
 
-if DEBUG:   print_cqm_extrainfo(full_cqm_solution, full_cqm_info)
+if VERBOSE:   print_cqm_extrainfo(full_cqm_solution, full_cqm_info)
