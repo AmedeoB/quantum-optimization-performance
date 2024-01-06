@@ -1,3 +1,22 @@
+# ===========================================================================================================================
+# This code was published under the MIT License, January 2024.
+# GitHub repository: https://github.com/AmedeoB/quantum-optimization-performance
+
+# This code was written as a test unit for the publication "Evaluation of Quantum and Hybrid Solvers for Combinatorial
+# Optimization" (Bertuzzi et al.) and is not meant for public nor industrial purposes. Despite being developed with the
+# possibility to change some parameters, it is not guaranteed that the code will run as it should if some are changed
+# in an erroneous or unpredicted way. 
+# Please refere to the README file, available at the upmentioned repository to read how it works.
+# _______________________
+# Author: AAA
+# ____________________________________________________________________
+# Collaborators: BBB, CCC, DDD
+# ________________________________________________________________________________________________________
+# Related Paper: Evaluation of Quantum and Hybrid Solvers for Combinatorial Optimization (AAA et al.)
+# ===========================================================================================================================
+
+
+
 """
  __________________________________ MODEL VARIABLES DICTIONARY ______________________________________________________________
 |____________________________________________________________________________________________________________________________|
