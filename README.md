@@ -16,7 +16,6 @@
   - [ ] DWAVE main
   - [ ] DWAVE funzioni
   - [x] funzioni & strutture
-- [ ] Aggiungere una guida di installazione o almeno le dipendenze 
 
 
 # Section Title
