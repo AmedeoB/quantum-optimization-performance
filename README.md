@@ -19,7 +19,7 @@ Here two `main_` files are visible, one for D-Wave Hybrid solver and one for the
 
 Once setup your constants, simply run.
 
-**IMPORTANT:** _Despite the cure we applied developing this test code, it is not primary meant for public use, changin constants values may cause malfunctions_
+**IMPORTANT:** _Despite the cure we applied developing this test code, it is not primary meant for public use, changing constants values may cause malfunctions_
 
 
 
