@@ -8,11 +8,11 @@
 # in an erroneous or unpredicted way. 
 # Please refere to the README file, available at the upmentioned repository to read how it works.
 # _______________________
-# Author: AAA
+# Author: Amedeo Bertuzzi
 # ____________________________________________________________________
-# Collaborators: BBB, CCC, DDD
+# Collaborators: Michele Amoretti, Davide Ferrari, University of Parma
 # ________________________________________________________________________________________________________
-# Related Paper: Evaluation of Quantum and Hybrid Solvers for Combinatorial Optimization (AAA et al.)
+# Related Paper: Evaluation of Quantum and Hybrid Solvers for Combinatorial Optimization (Bertuzzi et al.)
 # ===========================================================================================================================
 
 
