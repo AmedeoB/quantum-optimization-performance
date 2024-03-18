@@ -1,5 +1,5 @@
 # Abstract
-This folder contains the test code used to evaluate D-Wave Hybrid technologies and confronting them with IBM CPLEX solver. Complete study and results are published at [this link](www.google.com).
+This folder contains the test code used to evaluate D-Wave Hybrid technologies and confronting them with IBM CPLEX solver. Complete study and results are published at [this link](https://arxiv.org/abs/2403.10455).
 
 
 ## Project Dependencies
